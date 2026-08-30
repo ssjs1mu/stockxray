@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Joshi's Corner — Total Stock X-Ray</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg-0:#060a14; --bg-1:#0b1220; --bg-2:#111b2e; --glass:rgba(18,27,46,.62);
+  --border:rgba(212,175,55,.22); --border-soft:rgba(255,255,255,.06);
+  --gold:#d4af37; --gold-2:#f3d576; --gold-dim:#8a712a;
+  --bull:#18c98f; --bull-dim:#0d5c42; --bear:#f4495c; --bear-dim:#6e1c25;
+  --amber:#e8a33d; --violet:#8b7bd8;
+  --ink-0:#f4f1e6; --ink-1:#c9cfdd; --ink-2:#8892a6;
+  --mono:'JetBrains Mono','SFMono-Regular',Consolas,monospace;
+  --sans:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --brush:'Brush Script MT','Segoe Script',cursive;
+  --r:14px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:
+  radial-gradient(1200px 600px at 15% -10%, #16233f 0%, transparent 60%),
+  radial-gradient(1000px 500px at 110% 10%, #1a2540 0%, transparent 55%),
+  linear-gradient(180deg,var(--bg-0),var(--bg-1) 40%,var(--bg-0));
+  color:var(--ink-1); font-family:var(--sans); min-height:100vh;
+}
+::selection{background:var(--gold);color:#111}
+.wrap{max-width:1360px;margin:0 auto;padding:28px 22px 60px}
+.brand{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:6px}
+.brand h1{font-family:var(--brush);font-weight:400;font-size:44px;letter-spacing:.5px;
+  background:linear-gradient(120deg,var(--gold-2),var(--gold) 45%,#a9832a);
+  -webkit-background-clip:text;background-clip:text;color:transparent;margin:0;
+  filter:drop-shadow(0 1px 0 rgba(0,0,0,.4));}
+.brand .tag{font-family:var(--sans);font-size:11px;letter-spacing:3px;text-transform:uppercase;
+  color:var(--ink-2);border:1px solid var(--border);padding:5px 10px;border-radius:999px;background:rgba(212,175,55,.05)}
+.subtitle{font-size:13px;color:var(--ink-2);margin:2px 0 22px;letter-spacing:.3px}
+.hr-gold{height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent);margin:18px 0}
+
+/* 3D professional gradient tile */
+.tile{
+  position:relative;border-radius:var(--r);
+  background:linear-gradient(155deg,rgba(30,42,68,.85),rgba(13,19,34,.9) 60%);
+  border:1px solid var(--border-soft);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.05) inset,
+    0 -18px 30px -22px rgba(212,175,55,.08) inset,
+    0 14px 30px -14px rgba(0,0,0,.65),
+    0 2px 6px rgba(0,0,0,.5);
+  padding:18px 20px; transition:transform .18s ease, box-shadow .18s ease;
+}
+.tile:hover{transform:translateY(-2px);box-shadow:0 1px 0 rgba(255,255,255,.06) inset,0 -18px 30px -22px rgba(212,175,55,.14) inset,0 20px 38px -16px rgba(0,0,0,.7),0 4px 10px rgba(0,0,0,.55)}
+.tile::before{content:"";position:absolute;inset:0;border-radius:var(--r);padding:1px;
+  background:linear-gradient(155deg,rgba(212,175,55,.35),transparent 40%,rgba(212,175,55,.08));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+.tile.gold{background:linear-gradient(155deg,rgba(70,58,20,.9),rgba(18,15,8,.94) 65%)}
+.tile.bull{background:linear-gradient(155deg,rgba(13,60,45,.85),rgba(10,18,20,.92) 65%)}
+.tile.bear{background:linear-gradient(155deg,rgba(70,20,26,.85),rgba(20,10,13,.92) 65%)}
+
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(2,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g4{grid-template-columns:repeat(4,1fr)}
+.g5{grid-template-columns:repeat(5,1fr)}
+@media(max-width:1100px){.g4,.g5{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:640px){.g2,.g3,.g4,.g5{grid-template-columns:1fr}}
+
+.eyebrow{font-size:10.5px;letter-spacing:2.2px;text-transform:uppercase;color:var(--gold);opacity:.85;margin:0 0 6px;font-weight:600}
+.big{font-family:var(--mono);font-size:30px;color:var(--ink-0);font-weight:600;letter-spacing:-.5px}
+.mid{font-family:var(--mono);font-size:19px;color:var(--ink-0);font-weight:600}
+.lbl{font-size:11.5px;color:var(--ink-2);letter-spacing:.3px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;
+  font-weight:700;padding:4px 11px;border-radius:999px}
+.pill.buy{background:linear-gradient(120deg,#0f5e44,#0a3d2d);color:#7de8bd;border:1px solid rgba(24,201,143,.4)}
+.pill.sell{background:linear-gradient(120deg,#5e1620,#3d0f16);color:#ff9aa6;border:1px solid rgba(244,73,92,.4)}
+.pill.neutral{background:linear-gradient(120deg,#3a3220,#241f14);color:var(--gold-2);border:1px solid rgba(212,175,55,.35)}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+.dot.green{background:var(--bull);box-shadow:0 0 8px var(--bull)}
+.dot.amber{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+.dot.violet{background:var(--violet);box-shadow:0 0 8px var(--violet)}
+
+.up{color:var(--bull)} .down{color:var(--bear)}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;font-size:10.5px;letter-spacing:1px;text-transform:uppercase;color:var(--gold-2);
+  padding:9px 10px;border-bottom:1px solid var(--border);position:sticky;top:0;background:#0d1524;z-index:2}
+td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.045);color:var(--ink-1);font-family:var(--mono)}
+tr:hover td{background:rgba(212,175,55,.045)}
+.card-title{font-size:14px;color:var(--ink-0);font-weight:600;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+.card-title .ic{color:var(--gold)}
+input,select,button{font-family:var(--sans);border-radius:9px;border:1px solid var(--border-soft);
+  background:rgba(10,15,26,.7);color:var(--ink-0);padding:9px 12px;font-size:13px}
+input:focus,select:focus{outline:none;border-color:var(--gold)}
+button.gold{background:linear-gradient(135deg,var(--gold-2),var(--gold-dim));color:#181206;font-weight:700;
+  border:none;cursor:pointer;letter-spacing:.4px;box-shadow:0 6px 16px -6px rgba(212,175,55,.5)}
+button.gold:hover{filter:brightness(1.08)}
+button.ghost{background:transparent;border:1px solid var(--border);color:var(--gold-2);cursor:pointer}
+.footer{margin-top:36px;font-size:11px;color:var(--ink-2);text-align:center;letter-spacing:.3px}
+.badge-tier{font-size:9.5px;letter-spacing:1px;text-transform:uppercase;color:var(--ink-2);display:inline-flex;gap:5px;align-items:center}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#20304f;border-radius:6px}
+
+/* ---- Global print fix: override CSS custom properties for print, since
+   every element reads color via var(--ink-0) etc. Without this, print
+   keeps the dark-theme (near-white) values -> invisible text on white paper. ---- */
+@media print{
+  :root{
+    --bg-0:#fff; --bg-1:#fff; --bg-2:#fff; --glass:#fff;
+    --border:#999; --border-soft:#ccc;
+    --gold:#7a5d13; --gold-2:#5b4610; --gold-dim:#7a5d13;
+    --bull:#0a7a4f; --bull-dim:#cdeee0; --bear:#a3152a; --bear-dim:#f6d3d8;
+    --amber:#8a6414; --violet:#4c3f92;
+    --ink-0:#101317; --ink-1:#2a2f38; --ink-2:#5b6270;
+  }
+  html,body{background:#fff !important;color:var(--ink-1) !important}
+  .tile{background:#fff !important;box-shadow:none !important;border:1px solid #aaa !important}
+  .tile::before{display:none !important}
+  .tile.gold,.tile.bull,.tile.bear{background:#fff !important}
+  .brand h1{-webkit-text-fill-color:var(--gold) !important;color:var(--gold) !important;background:none !important}
+  .pill.buy{background:#dff5ea !important;color:#0a7a4f !important;border:1px solid #0a7a4f !important}
+  .pill.sell{background:#fbe1e4 !important;color:#a3152a !important;border:1px solid #a3152a !important}
+  .pill.neutral{background:#f5edd6 !important;color:#7a5d13 !important;border:1px solid #7a5d13 !important}
+  th{background:#eee !important;color:#101317 !important;position:static !important}
+  td{color:var(--ink-1) !important}
+  .no-print{display:none !important}
+  a{color:var(--gold) !important}
+}
+
+/* page-specific */
+.searchbar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.searchbar .field{display:flex;flex-direction:column;gap:4px}
+.searchbar input{font-size:15px;padding:12px 14px;font-family:var(--mono);letter-spacing:1px;min-width:220px}
+.searchbar select{font-size:15px;padding:12px 14px;min-width:100px}
+#fetchStatus{margin-top:12px;font-size:12px;min-height:18px}
+#fetchStatus .step{display:block;margin:2px 0}
+.tiers{display:flex;gap:16px;margin-top:10px;flex-wrap:wrap}
+#reportArea{display:none;margin-top:24px}
+.gauge-wrap{display:flex;align-items:center;gap:14px}
+.gauge{width:64px;height:64px;border-radius:50%;position:relative;flex:none}
+.gauge svg{transform:rotate(-90deg)}
+.levelrow{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed rgba(255,255,255,.06);font-family:var(--mono);font-size:12.5px}
+.levelrow:last-child{border-bottom:none}
+.taglabel{font-size:10px;letter-spacing:1px;color:var(--ink-2);text-transform:uppercase}
+.calc-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.rationale{font-size:12.5px;line-height:1.65;color:var(--ink-1);font-family:var(--sans)}
+.rationale b{color:var(--gold-2)}
+.appsscript{font-size:11px;color:var(--ink-2)}
+.appsscript input{width:100%;font-family:var(--mono);font-size:11px}
+#emptyState{padding:60px 20px;text-align:center;color:var(--ink-2)}
+#emptyState .ic{font-size:40px;margin-bottom:10px;display:block}
+.spinner{display:inline-block;width:13px;height:13px;border:2px solid rgba(212,175,55,.25);border-top-color:var(--gold);
+  border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes blinkRow{0%,100%{background:rgba(244,73,92,.16)}50%{background:rgba(244,73,92,.42)}}
+.blink-support{animation:blinkRow 1.4s ease-in-out infinite}
+@keyframes blinkNear{0%,100%{outline:2px solid rgba(212,175,55,.0)}50%{outline:2px solid rgba(212,175,55,.85)}}
+.blink-near{animation:blinkNear 1.4s ease-in-out infinite;border-radius:6px}
+.zone-band{background:rgba(212,175,55,.10) !important}
+.ind-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px dashed rgba(255,255,255,.06);border-left:3px solid transparent;padding-left:8px}
+.ind-row.confirm{border-left-color:var(--bull)}
+.ind-row.conflict{border-left-color:var(--bear)}
+.ind-row .drv{font-size:8.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--gold);border:1px solid var(--border);border-radius:4px;padding:1px 5px;margin-left:6px}
+.linklist a{display:inline-block;margin:4px 10px 4px 0;font-size:11.5px;color:var(--gold-2);text-decoration:none;border-bottom:1px dotted var(--gold-2)}
+.linklist a:hover{color:var(--gold-2);opacity:.8}
+.heuristic-tag{font-size:9.5px;color:var(--ink-2);font-style:italic}
+.sourcebadge{font-size:9.5px;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:5px;font-weight:700}
+.sourcebadge.live{background:rgba(24,201,143,.16);color:#7de8bd}
+.sourcebadge.proxy{background:rgba(232,163,61,.16);color:var(--amber)}
+.sourcebadge.appsscript{background:rgba(139,123,216,.16);color:var(--violet)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">
+    <h1>Joshi's Corner</h1>
+    <span class="tag">Private Client Research Terminal</span>
+  </div>
+
+  <div class="tile gold no-print" style="padding:20px 22px">
+    <div class="card-title"><span class="ic">◆</span> Symbol &amp; Exchange</div>
+    <div class="searchbar">
+      <div class="field"><label class="lbl">NSE / BSE Symbol</label>
+        <input id="symInput" autocomplete="off" placeholder="e.g. RELIANCE, HAL, TEJASNET..." />
+      </div>
+      <div class="field"><label class="lbl">Exchange</label>
+        <select id="exchInput"><option>NSE</option><option>BSE</option></select>
+      </div>
+      <button class="gold" onclick="fetchAndRender()">Fetch &amp; Generate X-Ray</button>
+      <button class="ghost" onclick="window.print()">🖶 Print / PDF</button>
+    </div>
+    <div class="lbl" style="margin-top:10px">No pre-loaded stock list — every report is fetched live for whatever symbol you type. Optional: fill in your Apps Script URL below first for the most reliable feed; otherwise this pulls straight from a free public quote source in your browser.</div>
+    <div id="fetchStatus"></div>
+    <div class="tiers">
+      <span class="badge-tier"><span class="sourcebadge appsscript">Apps Script</span> your backend, most reliable</span>
+      <span class="badge-tier"><span class="sourcebadge live">Direct fetch</span> free public source</span>
+      <span class="badge-tier"><span class="sourcebadge proxy">Via CORS proxy</span> fallback if direct is blocked</span>
+    </div>
+  </div>
+
+  <div class="tile no-print" id="manualPanel" style="display:none;margin-top:16px">
+    <div class="card-title"><span class="ic">✎</span> Live Fetch Failed — Enter Data Manually</div>
+    <div class="lbl" style="margin-bottom:10px">All three fetch attempts (Apps Script / direct / proxy) failed for this symbol — likely a network or CORS block in this environment. You can still generate the report by typing in what you know; the same background formulas run either way.</div>
+    <div class="grid g4">
+      <div><label class="lbl">Symbol *</label><br><input id="m_symbol" style="width:100%"></div>
+      <div><label class="lbl">Exchange</label><br><select id="m_exchange" style="width:100%"><option>NSE</option><option>BSE</option></select></div>
+      <div><label class="lbl">LTP / Current Price</label><br><input id="m_ltp" type="number" style="width:100%"></div>
+      <div><label class="lbl">Prev. Close</label><br><input id="m_prevclose" type="number" style="width:100%"></div>
+      <div><label class="lbl">Day Open</label><br><input id="m_open" type="number" style="width:100%"></div>
+      <div><label class="lbl">Day High</label><br><input id="m_high" type="number" style="width:100%"></div>
+      <div><label class="lbl">Day Low</label><br><input id="m_low" type="number" style="width:100%"></div>
+      <div><label class="lbl">Day Volume</label><br><input id="m_vol" type="number" style="width:100%"></div>
+      <div><label class="lbl">Call (if you have a view)</label><br><select id="m_call" style="width:100%"><option value="">— none —</option><option>BUY</option><option>SELL</option></select></div>
+      <div><label class="lbl">Entry</label><br><input id="m_entry" type="number" style="width:100%"></div>
+      <div><label class="lbl">Stoploss</label><br><input id="m_sl" type="number" style="width:100%"></div>
+      <div><label class="lbl">Target 1 (optional — auto if blank)</label><br><input id="m_t1" type="number" style="width:100%"></div>
+      <div><label class="lbl">Target 2 (optional — auto if blank)</label><br><input id="m_t2" type="number" style="width:100%"></div>
+    </div>
+    <div style="margin-top:12px"><button class="gold" onclick="loadManual()">Generate X-Ray from this data</button></div>
+  </div>
+
+  <div id="emptyState">
+    <span class="ic">◈</span>
+    Enter a symbol and exchange above, then Fetch &amp; Generate — live price, OHLC and technicals are pulled and computed on the fly, for any NSE/BSE symbol.
+  </div>
+
+  <div id="reportArea"></div>
+
+  <div class="tile no-print" style="margin-top:22px">
+    <div class="card-title"><span class="ic">⇄</span> Live Data Connection</div>
+    <div class="appsscript">
+      Fetch priority: <b>1)</b> your Apps Script URL below (if filled in — same backend pattern as the Big Fish Scanner / Macro dashboard, most reliable for NSE/BSE) →
+      <b>2)</b> a direct browser fetch to a free public quote source (Yahoo Finance chart API) →
+      <b>3)</b> the same request routed through a public CORS proxy if the direct fetch is blocked.
+      RSI/MACD/ADX/Bollinger/OBV/Supertrend/50&amp;200-DMA are all computed client-side from the fetched price history — nothing here is hardcoded.
+      <br><br>
+      <label class="lbl">APPS_SCRIPT_URL (optional) — expected to accept <code>?symbol=SYM&amp;exchange=NSE</code> and return JSON with a daily OHLCV series</label>
+      <input type="text" id="appsScriptUrl" placeholder="https://script.google.com/macros/s/XXXXXXXX/exec?symbol=" />
+      <br><br>
+      <label class="lbl">CORS proxy fallback — pre-filled with a public proxy; swap for your own if you have one</label>
+      <input type="text" id="corsProxy" value="https://api.allorigins.win/raw?url=" />
+      <br><br>
+      <span class="lbl">This box is used automatically on every Fetch &amp; Generate — no separate button needed.</span>
+    </div>
+  </div>
+
+  <div class="footer">Joshi's Corner &middot; Educational research tool, not investment advice</div>
+</div>
+
+<script>
+// =====================================================================
+// Joshi's Corner — Total Stock X-Ray (live-fetch edition)
+// No embedded master list. Symbol + Exchange only; everything else is
+// fetched from a free public source and/or computed client-side from
+// the fetched daily OHLCV history.
+// =====================================================================
+
+const fmt = (n, d=2) => (n===null||n===undefined||n===''||Number.isNaN(n)) ? '—' : (typeof n==='number' ? n.toLocaleString('en-IN',{maximumFractionDigits:d,minimumFractionDigits:d}) : n);
+const arrow = (n) => (n>0?'▲':(n<0?'▼':'—'));
+const cls = (n) => n>0?'up':(n<0?'down':'');
+function money(n){ return isFinite(n) && n!==null && n!==undefined ? '₹'+fmt(n,2) : '—'; }
+function num(id){ const v=document.getElementById(id).value; return v===''?null:parseFloat(v); }
+function txt(id){ return document.getElementById(id).value.trim(); }
+
+// ---------------------------------------------------------------------
+// Technical analysis math — all computed from a plain array of daily bars
+// bars = [{t,o,h,l,c,v}, ...] oldest -> newest
+// ---------------------------------------------------------------------
+function sma(vals, period, idx){
+  if(idx < period-1) return null;
+  let s=0; for(let i=idx-period+1;i<=idx;i++) s+=vals[i];
+  return s/period;
+}
+function stddev(vals, period, idx, meanVal){
+  if(idx < period-1) return null;
+  let s=0; for(let i=idx-period+1;i<=idx;i++) s += Math.pow(vals[i]-meanVal,2);
+  return Math.sqrt(s/period);
+}
+function emaSeries(vals, period){
+  const k = 2/(period+1);
+  const out = new Array(vals.length).fill(null);
+  let seed = null, seedCount=0, seedSum=0;
+  for(let i=0;i<vals.length;i++){
+    if(seed===null){
+      seedSum+=vals[i]; seedCount++;
+      if(seedCount===period){ seed = seedSum/period; out[i]=seed; }
+    } else {
+      seed = vals[i]*k + seed*(1-k);
+      out[i]=seed;
+    }
+  }
+  return out;
+}
+function rsiSeries(closes, period=14){
+  const out = new Array(closes.length).fill(null);
+  let avgGain=0, avgLoss=0;
+  for(let i=1;i<closes.length;i++){
+    const chg = closes[i]-closes[i-1];
+    const gain = Math.max(chg,0), loss = Math.max(-chg,0);
+    if(i<=period){
+      avgGain += gain/period; avgLoss += loss/period;
+      if(i===period){ out[i] = 100 - 100/(1+(avgLoss===0?100:avgGain/avgLoss)); }
+    } else {
+      avgGain = (avgGain*(period-1)+gain)/period;
+      avgLoss = (avgLoss*(period-1)+loss)/period;
+      const rs = avgLoss===0 ? 100 : avgGain/avgLoss;
+      out[i] = 100 - 100/(1+rs);
+    }
+  }
+  return out;
+}
+function trSeries(bars){
+  const out = new Array(bars.length).fill(null);
+  for(let i=0;i<bars.length;i++){
+    if(i===0){ out[i] = bars[i].h-bars[i].l; continue; }
+    out[i] = Math.max(bars[i].h-bars[i].l, Math.abs(bars[i].h-bars[i-1].c), Math.abs(bars[i].l-bars[i-1].c));
+  }
+  return out;
+}
+function atrSeries(bars, period=14){
+  const tr = trSeries(bars);
+  const out = new Array(bars.length).fill(null);
+  let seed=null;
+  for(let i=0;i<bars.length;i++){
+    if(i<period){ continue; }
+    if(seed===null){
+      let s=0; for(let j=1;j<=period;j++) s+=tr[j];
+      seed = s/period; out[period]=seed;
+    } else {
+      seed = (seed*(period-1)+tr[i])/period;
+      out[i]=seed;
+    }
+  }
+  return out;
+}
+function adxSeries(bars, period=14){
+  const n = bars.length;
+  const plusDM = new Array(n).fill(0), minusDM = new Array(n).fill(0);
+  for(let i=1;i<n;i++){
+    const up = bars[i].h-bars[i-1].h, down = bars[i-1].l-bars[i].l;
+    plusDM[i] = (up>down && up>0) ? up : 0;
+    minusDM[i] = (down>up && down>0) ? down : 0;
+  }
+  const tr = trSeries(bars);
+  let smTR=null, smPlus=null, smMinus=null;
+  const plusDI = new Array(n).fill(null), minusDI = new Array(n).fill(null), dx = new Array(n).fill(null);
+  for(let i=1;i<n;i++){
+    if(i<period) continue;
+    if(smTR===null){
+      let sTR=0,sP=0,sM=0;
+      for(let j=1;j<=period;j++){ sTR+=tr[j]; sP+=plusDM[j]; sM+=minusDM[j]; }
+      smTR=sTR; smPlus=sP; smMinus=sM;
+    } else {
+      smTR = smTR - smTR/period + tr[i];
+      smPlus = smPlus - smPlus/period + plusDM[i];
+      smMinus = smMinus - smMinus/period + minusDM[i];
+    }
+    plusDI[i] = 100*smPlus/smTR;
+    minusDI[i] = 100*smMinus/smTR;
+    dx[i] = 100*Math.abs(plusDI[i]-minusDI[i])/(plusDI[i]+minusDI[i] || 1);
+  }
+  const adx = new Array(n).fill(null);
+  let seedAdx=null;
+  for(let i=0;i<n;i++){
+    if(dx[i]===null) continue;
+    if(seedAdx===null){
+      // seed once we have `period` dx values
+      const startIdx = i;
+      let cnt=0,s=0,j=i;
+      while(j<n && cnt<period){ if(dx[j]!==null){ s+=dx[j]; cnt++; } j++; }
+      if(cnt===period){ seedAdx = s/period; adx[j-1]=seedAdx; i=j-1; }
+    } else {
+      seedAdx = (seedAdx*(period-1)+dx[i])/period;
+      adx[i]=seedAdx;
+    }
+  }
+  return { plusDI, minusDI, adx };
+}
+function obvSeries(bars){
+  const out = new Array(bars.length).fill(0);
+  for(let i=1;i<bars.length;i++){
+    if(bars[i].c>bars[i-1].c) out[i]=out[i-1]+bars[i].v;
+    else if(bars[i].c<bars[i-1].c) out[i]=out[i-1]-bars[i].v;
+    else out[i]=out[i-1];
+  }
+  return out;
+}
+function supertrendSeries(bars, period=10, mult=3){
+  const atr = atrSeries(bars, period);
+  const n = bars.length;
+  const upperBasic = new Array(n).fill(null), lowerBasic = new Array(n).fill(null);
+  const upperFinal = new Array(n).fill(null), lowerFinal = new Array(n).fill(null);
+  const trendUp = new Array(n).fill(null);
+  for(let i=0;i<n;i++){
+    if(atr[i]===null) continue;
+    const mid = (bars[i].h+bars[i].l)/2;
+    upperBasic[i] = mid + mult*atr[i];
+    lowerBasic[i] = mid - mult*atr[i];
+    if(upperFinal[i-1]===undefined || upperFinal[i-1]===null){
+      upperFinal[i]=upperBasic[i]; lowerFinal[i]=lowerBasic[i]; trendUp[i]=true;
+    } else {
+      upperFinal[i] = (upperBasic[i]<upperFinal[i-1] || bars[i-1].c>upperFinal[i-1]) ? upperBasic[i] : upperFinal[i-1];
+      lowerFinal[i] = (lowerBasic[i]>lowerFinal[i-1] || bars[i-1].c<lowerFinal[i-1]) ? lowerBasic[i] : lowerFinal[i-1];
+      if(bars[i].c > upperFinal[i-1]) trendUp[i]=true;
+      else if(bars[i].c < lowerFinal[i-1]) trendUp[i]=false;
+      else trendUp[i]=trendUp[i-1];
+    }
+  }
+  return { trendUp, upperFinal, lowerFinal };
+}
+function structureLabel(bars){
+  const n = bars.length;
+  if(n<20) return 'Insufficient history';
+  const recent = bars.slice(n-10), prior = bars.slice(n-20,n-10);
+  const recentHigh = Math.max(...recent.map(b=>b.h)), recentLow = Math.min(...recent.map(b=>b.l));
+  const priorHigh = Math.max(...prior.map(b=>b.h)), priorLow = Math.min(...prior.map(b=>b.l));
+  if(recentHigh>priorHigh && recentLow>priorLow) return 'HH/HL';
+  if(recentHigh<priorHigh && recentLow<priorLow) return 'LH/LL';
+  return 'Mixed';
+}
+
+function computeTechnicals(bars){
+  const closes = bars.map(b=>b.c), vols = bars.map(b=>b.v);
+  const n = bars.length;
+  const last = n-1;
+  const sma20 = sma(closes,20,last), sma50 = sma(closes,50,last), sma200 = sma(closes,200,last);
+  const ema12 = emaSeries(closes,12), ema26 = emaSeries(closes,26);
+  const macdLine = closes.map((_,i)=> (ema12[i]!==null&&ema26[i]!==null)? ema12[i]-ema26[i] : null);
+  const macdValid = macdLine.filter(v=>v!==null);
+  const signalSeries = emaSeries(macdValid, 9);
+  const macdVal = macdValid.length? macdValid[macdValid.length-1] : null;
+  const signalVal = signalSeries.length? signalSeries[signalSeries.length-1] : null;
+  const rsi = rsiSeries(closes,14)[last];
+  const atr = atrSeries(bars,14)[last];
+  const {adx} = adxSeries(bars,14);
+  const adxVal = adx[last];
+  const obv = obvSeries(bars);
+  const obvTrend = (obv[last] > obv[last-5]) ? 'rising' : (obv[last] < obv[last-5] ? 'falling' : 'flat');
+  const st = supertrendSeries(bars,10,3);
+  const stUp = st.trendUp[last];
+  const mean20 = sma20, sd20 = stddev(closes,20,last,mean20);
+  const upperBB = (mean20!==null&&sd20!==null)? mean20+2*sd20 : null;
+  const lowerBB = (mean20!==null&&sd20!==null)? mean20-2*sd20 : null;
+  const pctB = (upperBB!==null && lowerBB!==null && upperBB!==lowerBB) ? (closes[last]-lowerBB)/(upperBB-lowerBB)*100 : null;
+  const structure = structureLabel(bars);
+  const trendBull = (sma20!==null && sma50!==null) ? closes[last]>sma20 && sma20>sma50 : null;
+  const trendBear = (sma20!==null && sma50!==null) ? closes[last]<sma20 && sma20<sma50 : null;
+
+  return {
+    sma20, sma50, sma200, macdVal, signalVal, rsi, atr, adxVal, obvTrend, stUp, pctB, structure,
+    trendLabel: trendBull? 'Bullish' : (trendBear? 'Bearish' : 'Neutral'),
+    macdLabel: (macdVal!==null&&signalVal!==null) ? (macdVal>signalVal?'Bullish':'Bearish') : null,
+    adxLabel: adxVal!==null ? (adxVal>=25 ? (stUp?'Strong Up ('+Math.round(adxVal)+')':'Strong Down ('+Math.round(adxVal)+')') : 'Weak/Range ('+Math.round(adxVal)+')') : null,
+    supertrendLabel: stUp===null? null : (stUp?'Bullish':'Bearish'),
+    bollingerLabel: pctB===null? null : (pctB>100?'Above Upper':(pctB<0?'Below Lower':Math.round(pctB)+'%B')),
+  };
+}
+
+// ---------------------------------------------------------------------
+// Pivot math
+// ---------------------------------------------------------------------
+function computePivots(H,L,C){
+  const P = (H+L+C)/3;
+  const classic = { P, R1: 2*P-L, S1: 2*P-H, R2: P+(H-L), S2: P-(H-L), R3: H+2*(P-L), S3: L-2*(H-P) };
+  const range = H-L;
+  const fib = { P, R1: P+0.382*range, S1: P-0.382*range, R2: P+0.618*range, S2: P-0.618*range, R3: P+range, S3: P-range };
+  const cam = { R1: C+range*1.1/12, S1: C-range*1.1/12, R2: C+range*1.1/6, S2: C-range*1.1/6, R3: C+range*1.1/4, S3: C-range*1.1/4, P: null };
+  const woodie = { P: (H+L+2*C)/4 };
+  woodie.R1 = 2*woodie.P - L; woodie.S1 = 2*woodie.P - H;
+  woodie.R2 = woodie.P + range; woodie.S2 = woodie.P - range;
+  return { classic, fib, cam, woodie };
+}
+
+function tradeStatus(call, cmp, sl, t1, t2){
+  if(call==='BUY'){
+    if(cmp<=sl) return 'SL HIT';
+    if(cmp>=t2) return 'T2 HIT';
+    if(cmp>=t1) return 'T1 HIT';
+    return 'ACTIVE';
+  } else {
+    if(cmp>=sl) return 'SL HIT';
+    if(cmp<=t2) return 'T2 HIT';
+    if(cmp<=t1) return 'T1 HIT';
+    return 'ACTIVE';
+  }
+}
+
+function gaugeSvg(score, max){
+  const p = Math.max(0, Math.min(1, (score+max)/(2*max)));
+  const r=26, c=2*Math.PI*r;
+  const color = score>0? 'var(--bull)' : (score<0?'var(--bear)':'var(--amber)');
+  return `<div class="gauge"><svg width="64" height="64">
+    <circle cx="32" cy="32" r="${r}" stroke="rgba(255,255,255,.08)" stroke-width="7" fill="none"/>
+    <circle cx="32" cy="32" r="${r}" stroke="${color}" stroke-width="7" fill="none"
+      stroke-dasharray="${c}" stroke-dashoffset="${c*(1-p)}" stroke-linecap="round"/>
+  </svg></div>`;
+}
+
+function probEstimate(score, maxScore){
+  const strength = maxScore ? Math.max(-1, Math.min(1, score/maxScore)) : 0;
+  let pT1 = 50 + strength*35; pT1 = Math.max(10, Math.min(90, pT1));
+  let pT2 = pT1 * 0.62; pT2 = Math.max(5, Math.min(80, pT2));
+  const r5 = x => Math.round(x/5)*5;
+  return { pT1: r5(pT1), pT2: r5(pT2) };
+}
+
+// ---- documented scoring heuristic (max ±7) built from the computed technicals ----
+function scoreFromTechnicals(t){
+  let score = 0, maxScore = 7;
+  if(t.trendLabel==='Bullish') score+=1; else if(t.trendLabel==='Bearish') score-=1;
+  if(t.macdLabel==='Bullish') score+=1; else if(t.macdLabel==='Bearish') score-=1;
+  if(t.adxVal!==null && t.adxVal>=25){ if(t.stUp) score+=1; else score-=1; }
+  if(t.supertrendLabel==='Bullish') score+=1; else if(t.supertrendLabel==='Bearish') score-=1;
+  if(t.rsi!==null){ if(t.rsi>50) score+=1; else if(t.rsi<50) score-=1; }
+  if(t.obvTrend==='rising') score+=1; else if(t.obvTrend==='falling') score-=1;
+  if(t.structure==='HH/HL') score+=1; else if(t.structure==='LH/LL') score-=1;
+  return { score, maxScore };
+}
+
+function classifyIndicators(t, call){
+  const bullish = call==='BUY';
+  const items = [];
+  const push = (name, value, isBull, isBear, isKey) => {
+    let state='neutral';
+    if(isBull!==null && isBear!==null){
+      if(bullish && isBull) state='confirm';
+      else if(!bullish && isBear) state='confirm';
+      else if(bullish && isBear) state='conflict';
+      else if(!bullish && isBull) state='conflict';
+    }
+    items.push({name, value, state, key:!!isKey});
+  };
+  if(t.trendLabel) push('Trend (Price vs SMA20/50)', t.trendLabel, t.trendLabel==='Bullish', t.trendLabel==='Bearish', true);
+  if(t.macdLabel) push('MACD', t.macdLabel, t.macdLabel==='Bullish', t.macdLabel==='Bearish', false);
+  if(t.supertrendLabel) push('Supertrend (10,3)', t.supertrendLabel, t.supertrendLabel==='Bullish', t.supertrendLabel==='Bearish', true);
+  if(t.adxLabel){
+    const strong = /Strong/.test(t.adxLabel);
+    push('ADX (14)', t.adxLabel, strong && /Up/.test(t.adxLabel), strong && /Down/.test(t.adxLabel), strong);
+  }
+  if(t.rsi!==null && t.rsi!==undefined){
+    const r = Math.round(t.rsi);
+    const lab = r + (r>70?' (Overbought)':(r<30?' (Oversold)':''));
+    push('RSI (14)', lab, r<30, r>70, r>70||r<30);
+  }
+  if(t.bollingerLabel) push('Bollinger %B', t.bollingerLabel, /Below Lower/.test(t.bollingerLabel), /Above Upper/.test(t.bollingerLabel), /Below Lower|Above Upper/.test(t.bollingerLabel));
+  if(t.structure) push('Structure', t.structure, t.structure==='HH/HL', t.structure==='LH/LL', false);
+  if(t.obvTrend) push('OBV', t.obvTrend, null, null, false);
+  if(t.sma50!==null) push('50 DMA', money(t.sma50), null, null, false);
+  if(t.sma200!==null) push('200 DMA', money(t.sma200), null, null, false);
+  return items;
+}
+
+function pivotTableHtml(label, p, cmp){
+  const rowsDef = [['R3',p.R3],['R2',p.R2],['R1',p.R1],['Pivot',p.P],['S1',p.S1],['S2',p.S2],['S3',p.S3]].filter(([,v])=>v!==null&&v!==undefined);
+  const sorted = rowsDef.filter(([,v])=>isFinite(v)).slice().sort((a,b)=>b[1]-a[1]);
+  let zoneLabels = new Set();
+  if(cmp!==null && isFinite(cmp) && sorted.length>1){
+    for(let i=0;i<sorted.length-1;i++){
+      if(cmp<=sorted[i][1] && cmp>=sorted[i+1][1]){ zoneLabels.add(sorted[i][0]); zoneLabels.add(sorted[i+1][0]); break; }
+    }
+  }
+  let nearestLabel=null, nearestDist=Infinity;
+  if(cmp!==null && isFinite(cmp)) sorted.forEach(([lab,v])=>{ const d=Math.abs(v-cmp); if(d<nearestDist){nearestDist=d;nearestLabel=lab;} });
+  const rowHtml = (lab,v,updown)=>{
+    const classes=[];
+    if(zoneLabels.has(lab)) classes.push('zone-band');
+    if(lab===nearestLabel) classes.push('blink-near');
+    return `<div class="levelrow ${classes.join(' ')}"><span class="taglabel">${lab}${lab===nearestLabel?' ◀ nearest':''}</span><span class="${updown}">${money(v)}</span></div>`;
+  };
+  return `<div class="tile"><div class="card-title"><span class="ic">▦</span> ${label} Pivot</div>
+    ${rowsDef.map(([lab,v])=>rowHtml(lab,v,lab==='Pivot'?'':(lab[0]==='R'?'up':'down'))).join('')}</div>`;
+}
+
+// ---------------------------------------------------------------------
+// Fetch chain: Apps Script -> direct Yahoo Finance -> Yahoo via CORS proxy
+// ---------------------------------------------------------------------
+function statusLine(text, kind){
+  const el = document.getElementById('fetchStatus');
+  const cls = kind==='ok' ? 'up' : (kind==='err' ? 'down' : '');
+  el.innerHTML += `<span class="step ${cls}">${text}</span>`;
+}
+function clearStatus(){ document.getElementById('fetchStatus').innerHTML=''; }
+
+function yahooSymbol(sym, exch){ return exch==='BSE' ? `${sym}.BO` : `${sym}.NS`; }
+
+async function fetchAppsScript(sym, exch){
+  const base = txt('appsScriptUrl');
+  if(!base) return null;
+  statusLine('<span class="spinner"></span>Trying your Apps Script backend…');
+  const url = base + encodeURIComponent(sym) + '&exchange=' + exch;
+  const resp = await fetch(url);
+  if(!resp.ok) throw new Error('Apps Script returned ' + resp.status);
+  const j = await resp.json();
+  statusLine('✓ Data received from Apps Script.', 'ok');
+  return { source: 'appsscript', json: j };
+}
+
+async function fetchYahooDirect(sym, exch){
+  statusLine('<span class="spinner"></span>Trying a direct fetch to Yahoo Finance…');
+  const ysym = yahooSymbol(sym, exch);
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ysym}?interval=1d&range=2y`;
+  const resp = await fetch(url);
+  if(!resp.ok) throw new Error('HTTP ' + resp.status);
+  const j = await resp.json();
+  statusLine('✓ Direct fetch succeeded.', 'ok');
+  return { source: 'direct', json: j };
+}
+
+async function fetchYahooViaProxy(sym, exch){
+  const proxy = txt('corsProxy') || 'https://api.allorigins.win/raw?url=';
+  statusLine('<span class="spinner"></span>Direct fetch blocked — retrying via CORS proxy…');
+  const ysym = yahooSymbol(sym, exch);
+  const target = `https://query1.finance.yahoo.com/v8/finance/chart/${ysym}?interval=1d&range=2y`;
+  const url = proxy + encodeURIComponent(target);
+  const resp = await fetch(url);
+  if(!resp.ok) throw new Error('HTTP ' + resp.status);
+  const j = await resp.json();
+  statusLine('✓ Fetched via CORS proxy.', 'ok');
+  return { source: 'proxy', json: j };
+}
+
+function parseYahooChart(j){
+  const result = j?.chart?.result?.[0];
+  if(!result) throw new Error('Unexpected response shape');
+  const meta = result.meta || {};
+  const ts = result.timestamp || [];
+  const q = result.indicators?.quote?.[0] || {};
+  const bars = [];
+  for(let i=0;i<ts.length;i++){
+    if(q.open[i]==null || q.high[i]==null || q.low[i]==null || q.close[i]==null) continue;
+    bars.push({ t: ts[i]*1000, o:q.open[i], h:q.high[i], l:q.low[i], c:q.close[i], v:q.volume[i]||0 });
+  }
+  if(!bars.length) throw new Error('No usable OHLCV bars in response');
+  const lastBar = bars[bars.length-1];
+  const cmp = meta.regularMarketPrice ?? lastBar.c;
+  const prevClose = meta.previousClose ?? (bars.length>1 ? bars[bars.length-2].c : lastBar.c);
+  const dayHigh = meta.regularMarketDayHigh ?? lastBar.h;
+  const dayLow = meta.regularMarketDayLow ?? lastBar.l;
+  const dayOpen = lastBar.o;
+  const dayVol = meta.regularMarketVolume ?? lastBar.v;
+  const name = meta.longName || meta.shortName || meta.symbol;
+  return { bars, cmp, prevClose, dayHigh, dayLow, dayOpen, dayVol, name };
+}
+
+async function fetchAndRender(){
+  const sym = txt('symInput').toUpperCase();
+  const exch = document.getElementById('exchInput').value;
+  if(!sym){ alert('Enter a symbol first.'); return; }
+  clearStatus();
+  document.getElementById('manualPanel').style.display='none';
+
+  let got = null, lastErr = null;
+  try{ got = await fetchAppsScript(sym, exch); }catch(e){ lastErr=e; statusLine('✗ Apps Script attempt failed: '+e.message, 'err'); }
+  if(!got){
+    try{ got = await fetchYahooDirect(sym, exch); }catch(e){ lastErr=e; statusLine('✗ Direct fetch blocked (likely CORS): '+e.message, 'err'); }
+  }
+  if(!got){
+    try{ got = await fetchYahooViaProxy(sym, exch); }catch(e){ lastErr=e; statusLine('✗ Proxy fetch also failed: '+e.message, 'err'); }
+  }
+  if(!got){
+    statusLine('All live-fetch attempts failed. You can enter data manually below, or check your network/Apps Script settings.', 'err');
+    const mp = document.getElementById('manualPanel');
+    mp.style.display='block';
+    document.getElementById('m_symbol').value = sym;
+    document.getElementById('m_exchange').value = exch;
+    mp.scrollIntoView({behavior:'smooth', block:'center'});
+    return;
+  }
+
+  try{
+    let parsed;
+    if(got.source==='appsscript' && got.json.bars){
+      // if the user's own backend already returns a bars[] array in the same shape, use it directly
+      parsed = { bars: got.json.bars, cmp: got.json.cmp, prevClose: got.json.prevClose, dayHigh: got.json.dayHigh,
+                 dayLow: got.json.dayLow, dayOpen: got.json.dayOpen, dayVol: got.json.dayVol, name: got.json.name || sym };
+    } else {
+      parsed = parseYahooChart(got.json);
+    }
+    renderFromFetch(sym, exch, parsed, got.source);
+  } catch(e){
+    statusLine('Fetched data but could not parse it: ' + e.message + ' — try manual entry.', 'err');
+    document.getElementById('manualPanel').style.display='block';
+    document.getElementById('m_symbol').value = sym;
+    document.getElementById('m_exchange').value = exch;
+  }
+}
+
+function renderFromFetch(sym, exch, parsed, source){
+  const t = computeTechnicals(parsed.bars);
+  const { score, maxScore } = scoreFromTechnicals(t);
+  const call = score>=3 ? 'BUY' : (score<=-3 ? 'SELL' : 'WATCH');
+  const entry = parsed.cmp;
+  const atr = t.atr || (parsed.dayHigh-parsed.dayLow) || entry*0.02;
+  let sl, t1, t2;
+  if(call==='SELL'){
+    sl = entry + 1.8*atr; t1 = entry - 1.8*atr*1.67; t2 = entry - 1.8*atr*1.67*1.6;
+  } else {
+    sl = entry - 1.8*atr; t1 = entry + 1.8*atr*1.67; t2 = entry + 1.8*atr*1.67*1.6;
+  }
+  const risk = Math.abs(entry-sl);
+  const riskPct = risk/entry*100;
+  const t1pct = Math.abs(t1-entry)/entry*100, t2pct = Math.abs(t2-entry)/entry*100;
+  const rr = risk>0 ? +(Math.abs(t1-entry)/risk).toFixed(2) : null;
+
+  const scan = {
+    Call: call, Score: score, 'Max Score': maxScore, Entry: entry, Stoploss: sl, 'Target 1': t1, 'Target 2': t2,
+    'Risk %': +riskPct.toFixed(2), 'Target 1 %': +t1pct.toFixed(2), 'Target 2 %': +t2pct.toFixed(2),
+    'Reward:Risk': rr, 'ATR(14)': +atr.toFixed(2), 'Current Price': entry
+  };
+  const wl = {
+    LTP: parsed.cmp, 'Prc Chg': +(parsed.cmp-parsed.prevClose).toFixed(2), '% Chg': (parsed.cmp-parsed.prevClose)/parsed.prevClose,
+    'Day Open': parsed.dayOpen, 'Day High': parsed.dayHigh, 'Day Low': parsed.dayLow, 'Prev.Close': parsed.prevClose,
+    'Day Vol': parsed.dayVol, Trend: `Live fetch (${source}) · ${t.sma50? '50DMA '+money(t.sma50):''} ${t.sma200? '· 200DMA '+money(t.sma200):''}`
+  };
+  const rec = { symbol: sym, name: parsed.name || sym, industry: exch, scan, wl, technicals: t, sourceTier: source };
+  render(sym, rec);
+}
+
+// ---------------------------------------------------------------------
+// Manual entry fallback (only shown if all fetch attempts fail)
+// ---------------------------------------------------------------------
+function loadManual(){
+  const sym = txt('m_symbol').toUpperCase();
+  if(!sym){ alert('Enter a symbol.'); return; }
+  const exch = txt('m_exchange');
+  const ltp = num('m_ltp'), prevClose = num('m_prevclose'), open = num('m_open'), high = num('m_high'), low = num('m_low'), vol = num('m_vol');
+  const call = txt('m_call') || null;
+  let entry = num('m_entry'), sl = num('m_sl'), t1 = num('m_t1'), t2 = num('m_t2');
+
+  let wl = null;
+  if(high!==null && low!==null && prevClose!==null){
+    wl = { LTP: ltp, 'Prc Chg': (ltp!==null&&prevClose)? +(ltp-prevClose).toFixed(2): null,
+           '% Chg': (ltp!==null&&prevClose)? (ltp-prevClose)/prevClose : null,
+           'Day Open': open, 'Day High': high, 'Day Low': low, 'Prev.Close': prevClose, 'Day Vol': vol,
+           Trend: 'Manually entered — no pivot narrative available.' };
+    if(call && (entry===null || sl===null)){
+      const pv = computePivots(high, low, prevClose);
+      entry = entry===null ? (ltp!==null?ltp:pv.classic.P) : entry;
+      if(call==='BUY'){ sl = sl===null?pv.classic.S1:sl; t1 = t1===null?pv.classic.R1:t1; t2 = t2===null?pv.classic.R2:t2; }
+      else { sl = sl===null?pv.classic.R1:sl; t1 = t1===null?pv.classic.S1:t1; t2 = t2===null?pv.classic.S2:t2; }
+    }
+  }
+
+  let scan = null;
+  if(call && entry!==null && sl!==null){
+    const risk = Math.abs(entry-sl), riskPct = risk/entry*100;
+    const t1pct = t1!==null ? Math.abs(t1-entry)/entry*100 : null;
+    const t2pct = t2!==null ? Math.abs(t2-entry)/entry*100 : null;
+    const rr = (t1!==null && risk>0) ? +(Math.abs(t1-entry)/risk).toFixed(2) : null;
+    scan = { Entry:entry, Call:call, Score: call==='BUY'?4:-4, 'Max Score':7,
+      'Risk %': +riskPct.toFixed(2), 'Target 1 %': t1pct!==null?+t1pct.toFixed(2):null, 'Target 2 %': t2pct!==null?+t2pct.toFixed(2):null,
+      'Reward:Risk': rr, Stoploss: sl, 'Target 1': t1, 'Target 2': t2,
+      'ATR(14)': (high!==null&&low!==null)? +(high-low).toFixed(2): null, 'Current Price': ltp!==null?ltp:entry, Status:'Manual' };
+  }
+  const rec = { symbol: sym, name: `${sym} (manually entered, ${exch})`, industry: 'Manual entry — no technicals feed', scan, wl, manual:true };
+  document.getElementById('manualPanel').style.display='none';
+  render(sym, rec);
+}
+
+// ---------------------------------------------------------------------
+// Render
+// ---------------------------------------------------------------------
+function tier(kind){
+  if(kind==='appsscript') return '<span class="sourcebadge appsscript">Apps Script</span>';
+  if(kind==='direct') return '<span class="sourcebadge live">Direct fetch</span>';
+  if(kind==='proxy') return '<span class="sourcebadge proxy">Via CORS proxy</span>';
+  return '<span class="dot violet"></span> Manual entry';
+}
+
+function render(sym, rec){
+  const scan = rec.scan || {};
+  const wl = rec.wl || {};
+  const t = rec.technicals || null;
+  document.getElementById('emptyState').style.display='none';
+  const area = document.getElementById('reportArea');
+  area.style.display='block';
+
+  const cmp = wl['LTP'] ?? scan['Current Price'] ?? null;
+  const chg = wl['Prc Chg'];
+  const chgPct = wl['% Chg'];
+  const call = scan['Call'];
+  const score = scan['Score'] ?? 0, maxScore = scan['Max Score'] ?? 7;
+
+  let pivots=null, pivotsHtml='';
+  if(wl['Day High'] && wl['Day Low'] && wl['Prev.Close']){
+    pivots = computePivots(wl['Day High'], wl['Day Low'], wl['Prev.Close']);
+    pivotsHtml = `<div class="grid g4">
+      ${pivotTableHtml('Classic', pivots.classic, cmp)}
+      ${pivotTableHtml('Fibonacci', pivots.fib, cmp)}
+      ${pivotTableHtml('Camarilla', pivots.cam, cmp)}
+      ${pivotTableHtml('Woodie', pivots.woodie, cmp)}
+    </div>
+    <div class="lbl" style="margin-top:8px">Gold-highlighted rows = the band the live price is currently trading within. The blinking row in each table = the single closest level price is approaching.</div>`;
+  } else {
+    pivotsHtml = `<div class="tile"><div class="card-title"><span class="dot violet"></span> Pivot Table Unavailable</div>
+    <div class="rationale">No Day High/Low/Prev.Close available for ${sym}.</div></div>`;
+  }
+
+  let tradeSetup = '';
+  if(scan['Entry']!==undefined && scan['Entry']!==null){
+    const status = (call==='BUY'||call==='SELL') ? tradeStatus(call, scan['Current Price'], scan['Stoploss'], scan['Target 1'], scan['Target 2']) : 'WATCHLIST';
+    const prob = probEstimate(score, maxScore);
+    tradeSetup = `<div class="tile ${call==='BUY'?'bull':(call==='SELL'?'bear':'gold')}">
+      <div class="card-title"><span class="ic">◎</span> Trade Setup <span class="pill ${call==='BUY'?'buy':(call==='SELL'?'sell':'neutral')}" style="margin-left:auto">${call||'—'}</span></div>
+      <div class="levelrow"><span class="taglabel">Entry</span><b>${money(scan['Entry'])}</b></div>
+      <div class="levelrow"><span class="taglabel">Stoploss</span><span class="down">${money(scan['Stoploss'])}</span></div>
+      <div class="levelrow"><span class="taglabel">Target 1</span><span class="up">${money(scan['Target 1'])} <small>(+${fmt(scan['Target 1 %'],2)}%)</small></span></div>
+      <div class="levelrow"><span class="taglabel">Target 2</span><span class="up">${money(scan['Target 2'])} <small>(+${fmt(scan['Target 2 %'],2)}%)</small></span></div>
+      <div class="hr-gold" style="margin:8px 0"></div>
+      <div class="levelrow"><span class="taglabel">Risk % <span class="lbl">(Entry→SL distance)</span></span><span>${fmt(scan['Risk %'],2)}%</span></div>
+      <div class="levelrow"><span class="taglabel">Reward : Risk <span class="lbl">(T1 gain ÷ Risk)</span></span><span>${fmt(scan['Reward:Risk'])}</span></div>
+      <div class="lbl" style="margin:4px 0 8px">Two different measures — Risk % is a distance (% move to stoploss); Reward:Risk is a ratio (rupees of reward per rupee risked).</div>
+      <div class="levelrow"><span class="taglabel">Est. chance to reach T1</span><b>~${prob.pT1}%</b></div>
+      <div class="levelrow"><span class="taglabel">Est. chance to reach T2</span><b>~${prob.pT2}%</b></div>
+      <div class="heuristic-tag">Heuristic from trend-score strength (score ${score}/±${maxScore}) — not a backtested win-rate.</div>
+      <div class="hr-gold" style="margin:8px 0"></div>
+      <div class="levelrow"><span class="taglabel">ATR (14)</span><span>${fmt(scan['ATR(14)'])}</span></div>
+      <div class="levelrow"><span class="taglabel">Trade Status</span><b>${status}</b></div>
+    </div>`;
+  } else {
+    tradeSetup = `<div class="tile"><div class="card-title"><span class="dot violet"></span> No Trade Setup</div><div class="rationale">Not enough data to compute Entry/Stoploss/Targets for ${sym}.</div></div>`;
+  }
+
+  let techTile = '';
+  if(t){
+    const items = classifyIndicators(t, call);
+    techTile = `<div class="tile">
+      <div class="card-title"><span class="ic">≋</span> Technical Indicators <span class="lbl" style="margin-left:auto">computed live from price history</span></div>
+      <div class="lbl" style="margin-bottom:6px">Green edge = confirms the ${call||'—'} call &middot; Red edge = conflicts &middot; KEY = stronger driver</div>
+      ${items.map(it=>`<div class="ind-row ${it.state}"><span class="taglabel">${it.name}${it.key?'<span class="drv">KEY</span>':''}</span><b>${it.value}</b></div>`).join('')}
+    </div>`;
+  } else {
+    techTile = `<div class="tile"><div class="card-title"><span class="dot violet"></span> No Technical Indicators</div>
+      <div class="rationale">Indicators need a fetched daily price history — not available for manual entries without a live source.</div></div>`;
+  }
+
+  let dayRangeTile = '';
+  if(wl['Day High']!==undefined && wl['Day High']!==null){
+    dayRangeTile = `<div class="tile">
+      <div class="card-title"><span class="ic">⛶</span> Day Range</div>
+      <div class="levelrow"><span class="taglabel">Open</span><span>${money(wl['Day Open'])}</span></div>
+      <div class="levelrow"><span class="taglabel">High</span><span class="up">${money(wl['Day High'])}</span></div>
+      <div class="levelrow"><span class="taglabel">Low</span><span class="down">${money(wl['Day Low'])}</span></div>
+      <div class="levelrow"><span class="taglabel">Prev. Close</span><span>${money(wl['Prev.Close'])}</span></div>
+      <div class="levelrow"><span class="taglabel">Day Volume</span><span>${fmt(wl['Day Vol'],0)}</span></div>
+      <div class="rationale" style="margin-top:8px">${wl['Trend']||''}</div>
+    </div>`;
+  }
+
+  const q = encodeURIComponent(sym);
+  const linksHtml = `<div class="tile">
+    <div class="card-title"><span class="ic">↗</span> Verify Further (free public sources)</div>
+    <div class="linklist">
+      <a href="https://www.tradingview.com/symbols/NSE-${q}/" target="_blank" rel="noopener">TradingView chart ↗</a>
+      <a href="https://www.screener.in/company/${q}/" target="_blank" rel="noopener">Screener.in fundamentals ↗</a>
+      <a href="https://www.nseindia.com/get-quotes/equity?symbol=${q}" target="_blank" rel="noopener">NSE India live quote ↗</a>
+      <a href="https://www.google.com/finance/quote/${q}:NSE" target="_blank" rel="noopener">Google Finance ↗</a>
+    </div>
+  </div>`;
+
+  let criticalSupport=null, criticalLabel='';
+  if(pivots){
+    const candidates = [['Classic S2',pivots.classic.S2],['Classic S3',pivots.classic.S3],
+      scan['Stoploss']!==undefined?['Stoploss',scan['Stoploss']]:null].filter(Boolean).filter(([,v])=>isFinite(v));
+    if(candidates.length){ candidates.sort((a,b)=>a[1]-b[1]); criticalLabel=candidates[0][0]; criticalSupport=candidates[0][1]; }
+  } else if(scan['Stoploss']!=null){ criticalLabel='Stoploss'; criticalSupport=scan['Stoploss']; }
+
+  let holdGuidance='';
+  const atrv = scan['ATR(14)'];
+  if(atrv && cmp){
+    const atrPct = atrv/cmp*100;
+    const t1pct = scan['Target 1 %'] || 6;
+    let weeks = Math.ceil(t1pct / Math.max(0.5, atrPct*2));
+    weeks = Math.max(1, Math.min(10, weeks));
+    holdGuidance = `<div class="rationale" style="margin-top:10px"><b>Suggested hold / accumulate window:</b> roughly ${weeks} week${weeks>1?'s':''} at this stock's current volatility (ATR ≈ ${fmt(atrPct,2)}% of price/day). If price pulls back toward ${pivots?money(pivots.classic.S1):'the nearest support'} without breaking the critical support below, that's a reasonable zone to accumulate rather than exit. <span class="heuristic-tag">Heuristic based on ATR and Target-1 distance.</span></div>`;
+  }
+
+  const recoveryCalc = `<div class="tile">
+    <div class="card-title"><span class="ic">↻</span> Mathematical Recovery &amp; Forward Plan</div>
+    <div class="calc-row">
+      <div><label class="lbl">Your Effective Avg. Cost</label><br><input type="number" id="avgCost_${sym}" placeholder="e.g. ${fmt(cmp,2)}" style="width:150px"></div>
+      <button class="ghost" onclick="computeRecovery('${sym}', ${cmp||0})">Compute</button>
+    </div>
+    <div id="recoveryOut_${sym}" style="margin-top:12px"></div>
+    ${criticalSupport? `<div class="levelrow blink-support" style="margin-top:10px;padding:8px 10px;border-radius:6px">
+      <span class="taglabel">⚠ Critical Support (${criticalLabel})</span><b class="down">${money(criticalSupport)}</b>
+    </div>
+    <div class="lbl" style="margin-top:4px">If price closes decisively below this level, the setup's thesis is broken — recovery to breakeven becomes unlikely without a fresh catalyst.</div>` : ''}
+    ${holdGuidance}
+  </div>`;
+
+  const header = `<div class="tile gold" style="padding:22px 24px">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:18px;align-items:flex-start">
+      <div>
+        <div class="eyebrow">${rec.industry||'NSE'} &middot; ${tier(rec.sourceTier)}</div>
+        <div style="font-size:26px;font-weight:800;color:var(--ink-0)">${sym} <span style="font-weight:400;font-size:14px;color:var(--ink-2)">${rec.name||''}</span></div>
+        <div style="margin-top:10px" class="big">${money(cmp)}
+          ${chg!==undefined && chg!==null? `<span style="font-size:15px;margin-left:10px" class="${cls(chg)}">${arrow(chg)} ${fmt(chg,2)} (${fmt(chgPct? chgPct*100 : (scan['P&L %']),2)}%)</span>` : ''}
+        </div>
+      </div>
+      <div style="text-align:right">
+        <span class="pill ${call==='BUY'?'buy':(call==='SELL'?'sell':'neutral')}">${call||'NO CALL'}</span>
+        <div style="margin-top:14px" class="gauge-wrap">
+          ${gaugeSvg(score,maxScore)}
+          <div><div class="lbl">Trend Scorecard</div><div class="mid">${score>0?'+':''}${score} / ±${maxScore}</div></div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+  area.innerHTML = `
+    ${header}
+    <div class="hr-gold"></div>
+    <div class="grid g3">${tradeSetup}${techTile}${dayRangeTile}</div>
+    <div class="hr-gold"></div>
+    ${pivotsHtml}
+    <div class="hr-gold"></div>
+    <div class="grid g2">${recoveryCalc}${linksHtml}</div>
+    <div class="footer" style="margin-top:20px">Symbol: ${sym} &middot; ${rec.sourceTier==='appsscript'?'Fetched from your Apps Script backend':(rec.sourceTier?'Fetched live from a free public source ('+rec.sourceTier+')':'Manually entered')}</div>
+  `;
+  area.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function computeRecovery(sym, cmp){
+  const el = document.getElementById('avgCost_'+sym);
+  const cost = parseFloat(el.value);
+  const out = document.getElementById('recoveryOut_'+sym);
+  if(!cost || cost<=0){ out.innerHTML = '<div class="rationale">Enter a valid average cost.</div>'; return; }
+  const be = cost, t5 = cost*1.05, t10 = cost*1.10;
+  const cmpNum = Number(cmp)||0;
+  const riseToBE = cmpNum? ((be-cmpNum)/cmpNum*100) : null;
+  const rise5 = cmpNum? ((t5-cmpNum)/cmpNum*100) : null;
+  const rise10 = cmpNum? ((t10-cmpNum)/cmpNum*100) : null;
+  out.innerHTML = `
+    <div class="levelrow"><span class="taglabel">Breakeven Target (0%)</span><b>₹${be.toFixed(2)}</b><span>${riseToBE!==null? (riseToBE>=0?'needs +':'')+riseToBE.toFixed(2)+'% from CMP':''}</span></div>
+    <div class="levelrow"><span class="taglabel">5% Recovery Target</span><b>₹${t5.toFixed(2)}</b><span>${rise5!==null? (rise5>=0?'needs +':'')+rise5.toFixed(2)+'% from CMP':''}</span></div>
+    <div class="levelrow"><span class="taglabel">10% Recovery Target</span><b>₹${t10.toFixed(2)}</b><span>${rise10!==null? (rise10>=0?'needs +':'')+rise10.toFixed(2)+'% from CMP':''}</span></div>
+  `;
+}
+
+</script>
+</body>
+</html>
