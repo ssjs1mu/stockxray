@@ -190,6 +190,9 @@ button.ghost{background:transparent;border:1px solid var(--border);color:var(--g
       <button class="ghost" onclick="window.print()">🖶 Print / PDF</button>
     </div>
     <div class="lbl" style="margin-top:10px">No pre-loaded stock list — every report is fetched live for whatever symbol you type. Optional: fill in your Apps Script URL below first for the most reliable feed; otherwise this pulls straight from a free public quote source in your browser.</div>
+    <div id="fileWarning" style="display:none;margin-top:10px;padding:10px 12px;border-radius:8px;background:rgba(244,73,92,.12);border:1px solid rgba(244,73,92,.4);font-size:12px;color:#ff9aa6">
+      ⚠ This page is open as a local file (<code>file://…</code>). Most browsers block outgoing live-data requests from local files for security — this is very likely why fetches fail here regardless of your internet connection. Host this file over <b>https://</b> (e.g. GitHub Pages, the same way your other dashboards run) to fix it properly.
+    </div>
     <div id="fetchStatus"></div>
     <div class="tiers">
       <span class="badge-tier"><span class="sourcebadge appsscript">Apps Script</span> your backend, most reliable</span>
@@ -237,10 +240,11 @@ button.ghost{background:transparent;border:1px solid var(--border);color:var(--g
       <label class="lbl">APPS_SCRIPT_URL (optional) — expected to accept <code>?symbol=SYM&amp;exchange=NSE</code> and return JSON with a daily OHLCV series</label>
       <input type="text" id="appsScriptUrl" placeholder="https://script.google.com/macros/s/XXXXXXXX/exec?symbol=" />
       <br><br>
-      <label class="lbl">CORS proxy fallback — pre-filled with a public proxy; swap for your own if you have one</label>
+      <label class="lbl">CORS proxy fallback — pre-filled with a public proxy; swap for your own if you have one. Several backup proxies are also tried automatically.</label>
       <input type="text" id="corsProxy" value="https://api.allorigins.win/raw?url=" />
       <br><br>
-      <span class="lbl">This box is used automatically on every Fetch &amp; Generate — no separate button needed.</span>
+      <button class="ghost" onclick="runDiagnostics()">Run Connection Diagnostics</button>
+      <div id="diagOut" style="margin-top:10px"></div>
     </div>
   </div>
 
@@ -581,16 +585,32 @@ function statusLine(text, kind){
 }
 function clearStatus(){ document.getElementById('fetchStatus').innerHTML=''; }
 
+if(window.location.protocol === 'file:'){
+  document.addEventListener('DOMContentLoaded', () => {
+    const w = document.getElementById('fileWarning');
+    if(w) w.style.display = 'block';
+  });
+}
+
 function yahooSymbol(sym, exch){ return exch==='BSE' ? `${sym}.BO` : `${sym}.NS`; }
 
 async function fetchAppsScript(sym, exch){
   const base = txt('appsScriptUrl');
   if(!base) return null;
+  if(base.includes('/dev')){
+    statusLine('⚠ Your Apps Script URL contains "/dev" — that\'s the editor\'s test link, which only works while you\'re logged in as the script owner and will always fail here. Use the URL from Deploy → Manage deployments (ends in "/exec") instead.', 'err');
+  }
   statusLine('<span class="spinner"></span>Trying your Apps Script backend…');
   const url = base + encodeURIComponent(sym) + '&exchange=' + exch;
-  const resp = await fetch(url);
-  if(!resp.ok) throw new Error('Apps Script returned ' + resp.status);
+  let resp;
+  try{
+    resp = await fetch(url);
+  } catch(e){
+    throw new Error(e.message + ' — a network-level failure like this on your own Apps Script URL usually means either the deployment\'s "Who has access" isn\'t set to "Anyone" (it redirects to a Google login page instead of responding), or this page is running from file:// rather than https://.');
+  }
+  if(!resp.ok) throw new Error('Apps Script returned HTTP ' + resp.status);
   const j = await resp.json();
+  if(j && j.error){ throw new Error('Apps Script responded but reported: ' + j.error); }
   statusLine('✓ Data received from Apps Script.', 'ok');
   return { source: 'appsscript', json: j };
 }
@@ -607,16 +627,27 @@ async function fetchYahooDirect(sym, exch){
 }
 
 async function fetchYahooViaProxy(sym, exch){
-  const proxy = txt('corsProxy') || 'https://api.allorigins.win/raw?url=';
-  statusLine('<span class="spinner"></span>Direct fetch blocked — retrying via CORS proxy…');
+  const userProxy = txt('corsProxy');
+  const proxies = userProxy ? [userProxy] : [];
+  proxies.push('https://api.allorigins.win/raw?url=', 'https://corsproxy.io/?url=', 'https://api.codetabs.com/v1/proxy?quest=');
   const ysym = yahooSymbol(sym, exch);
   const target = `https://query1.finance.yahoo.com/v8/finance/chart/${ysym}?interval=1d&range=2y`;
-  const url = proxy + encodeURIComponent(target);
-  const resp = await fetch(url);
-  if(!resp.ok) throw new Error('HTTP ' + resp.status);
-  const j = await resp.json();
-  statusLine('✓ Fetched via CORS proxy.', 'ok');
-  return { source: 'proxy', json: j };
+  let lastErr = null;
+  for(const proxy of proxies){
+    try{
+      statusLine(`<span class="spinner"></span>Trying proxy: ${proxy.split('/')[2]}…`);
+      const url = proxy + encodeURIComponent(target);
+      const resp = await fetch(url);
+      if(!resp.ok) throw new Error('HTTP ' + resp.status);
+      const j = await resp.json();
+      statusLine(`✓ Fetched via ${proxy.split('/')[2]}.`, 'ok');
+      return { source: 'proxy', json: j };
+    } catch(e){
+      lastErr = e;
+      statusLine(`✗ ${proxy.split('/')[2]} failed: ${e.message}`, 'err');
+    }
+  }
+  throw lastErr || new Error('All proxies failed');
 }
 
 function parseYahooChart(j){
@@ -649,6 +680,10 @@ async function fetchAndRender(){
   clearStatus();
   document.getElementById('manualPanel').style.display='none';
 
+  if(window.location.protocol === 'file:'){
+    statusLine('⚠ This page is open as a local file (file://). Most browsers block outgoing fetch() requests from local files to external servers for security — that\'s very likely why every attempt below fails with "Failed to fetch", regardless of your network. This is the same reason your other dashboards are hosted on GitHub Pages over HTTPS rather than opened as local files. Trying anyway…', 'err');
+  }
+
   let got = null, lastErr = null;
   try{ got = await fetchAppsScript(sym, exch); }catch(e){ lastErr=e; statusLine('✗ Apps Script attempt failed: '+e.message, 'err'); }
   if(!got){
@@ -658,7 +693,7 @@ async function fetchAndRender(){
     try{ got = await fetchYahooViaProxy(sym, exch); }catch(e){ lastErr=e; statusLine('✗ Proxy fetch also failed: '+e.message, 'err'); }
   }
   if(!got){
-    statusLine('All live-fetch attempts failed. You can enter data manually below, or check your network/Apps Script settings.', 'err');
+    statusLine('All live-fetch attempts failed.' + (window.location.protocol==='file:' ? ' Since this is opened as a local file, hosting it on GitHub Pages (like your other dashboards) is the most likely fix — see the note above.' : ' You can enter data manually below, or check your network/Apps Script settings.'), 'err');
     const mp = document.getElementById('manualPanel');
     mp.style.display='block';
     document.getElementById('m_symbol').value = sym;
@@ -757,9 +792,6 @@ function loadManual(){
   render(sym, rec);
 }
 
-// ---------------------------------------------------------------------
-// Render
-// ---------------------------------------------------------------------
 function tier(kind){
   if(kind==='appsscript') return '<span class="sourcebadge appsscript">Apps Script</span>';
   if(kind==='direct') return '<span class="sourcebadge live">Direct fetch</span>';
@@ -937,6 +969,49 @@ function computeRecovery(sym, cmp){
     <div class="levelrow"><span class="taglabel">10% Recovery Target</span><b>₹${t10.toFixed(2)}</b><span>${rise10!==null? (rise10>=0?'needs +':'')+rise10.toFixed(2)+'% from CMP':''}</span></div>
   `;
 }
+
+// ---------------------------------------------------------------------
+// Diagnostic tool — shows exactly what's failing and why, per URL
+// ---------------------------------------------------------------------
+async function runDiagnostics(){
+  const out = document.getElementById('diagOut');
+  out.innerHTML = '';
+  const line = (text, kind) => { out.innerHTML += `<div class="step ${kind==='ok'?'up':(kind==='err'?'down':'')}">${text}</div>`; };
+
+  line('Page origin: ' + window.location.protocol + '//' + (window.location.host || '(none — local file)'));
+  if(window.location.protocol === 'file:'){
+    line('⚠ Opened as a local file. Many browsers block fetch() from file:// to external hosts entirely — this alone can explain every failure below, independent of your actual internet connection. Host this file over https:// (GitHub Pages, same as your other dashboards) to rule this out.', 'err');
+  }
+
+  const targets = [
+    ['Yahoo Finance direct', 'https://query1.finance.yahoo.com/v8/finance/chart/RELIANCE.NS?interval=1d&range=5d'],
+    ['allorigins.win proxy', 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/RELIANCE.NS?interval=1d&range=5d')],
+    ['corsproxy.io proxy', 'https://corsproxy.io/?url=' + encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/RELIANCE.NS?interval=1d&range=5d')],
+    ['codetabs.com proxy', 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/RELIANCE.NS?interval=1d&range=5d')],
+  ];
+  const appsScript = txt('appsScriptUrl');
+  if(appsScript){
+    if(appsScript.includes('/dev')){
+      line('⚠ Your Apps Script URL contains "/dev" — this is the editor\'s test link (only works while logged in as the owner). Use Deploy → Manage deployments to get the real "/exec" URL.', 'err');
+    }
+    targets.unshift(['Your Apps Script URL', appsScript + 'RELIANCE&exchange=NSE']);
+  }
+
+  for(const [name, url] of targets){
+    const t0 = performance.now();
+    try{
+      const resp = await fetch(url);
+      const ms = Math.round(performance.now()-t0);
+      if(resp.ok){ line(`✓ ${name} — HTTP ${resp.status} in ${ms}ms`, 'ok'); }
+      else { line(`✗ ${name} — HTTP ${resp.status} (${resp.statusText}) in ${ms}ms`, 'err'); }
+    } catch(e){
+      const ms = Math.round(performance.now()-t0);
+      line(`✗ ${name} — network error after ${ms}ms: "${e.message}" (this is what a CORS block, DNS failure, or offline connection all look like — the browser doesn't distinguish them for security reasons)`, 'err');
+    }
+  }
+  line('If everything above shows ✗ and this page is at file://, that\'s almost certainly the cause — host it over https:// and re-run this test. If it\'s already hosted over https:// and still fails, it\'s a network/firewall/proxy-availability issue rather than this page\'s code.');
+}
+
 
 </script>
 </body>
