@@ -251,7 +251,7 @@ details.tile[open] summary{margin-bottom:14px}
       <input type="text" id="appsScriptUrl" placeholder="https://script.google.com/macros/s/XXXXXXXX/exec?symbol=" />
       <br><br>
       <label class="lbl">CORS proxy fallback — pre-filled with a public proxy; swap for your own if you have one. Several backup proxies are also tried automatically.</label>
-      <input type="text" id="corsProxy" value="https://api.allorigins.win/raw?url=" />
+      <input type="text" id="corsProxy" placeholder="https://api.allorigins.win/raw?url= (leave blank to use the built-in defaults)" />
       <br><br>
       <button class="ghost" onclick="runDiagnostics()">Run Connection Diagnostics</button>
       <div id="diagOut" style="margin-top:10px"></div>
@@ -605,6 +605,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const s = document.getElementById('symInput'), x = document.getElementById('exchInput');
   if(s){ s.addEventListener('input', updateDirectLink); }
   if(x){ x.addEventListener('change', updateDirectLink); }
+
+  // remember the Apps Script URL / custom CORS proxy between visits so they don't
+  // need retyping every reload — this is a standalone file you run locally, not a
+  // rendered chat artifact, so localStorage is appropriate here.
+  try{
+    const savedAS = localStorage.getItem('jc_xray_appsScriptUrl');
+    const savedProxy = localStorage.getItem('jc_xray_corsProxy');
+    if(savedAS) document.getElementById('appsScriptUrl').value = savedAS;
+    if(savedProxy) document.getElementById('corsProxy').value = savedProxy;
+    document.getElementById('appsScriptUrl').addEventListener('change', (e)=> localStorage.setItem('jc_xray_appsScriptUrl', e.target.value));
+    document.getElementById('corsProxy').addEventListener('change', (e)=> localStorage.setItem('jc_xray_corsProxy', e.target.value));
+  } catch(e){ /* localStorage unavailable — fields just won't persist, no functional loss */ }
 });
 
 function yahooSymbol(sym, exch){ return exch==='BSE' ? `${sym}.BO` : `${sym}.NS`; }
@@ -671,12 +683,8 @@ async function fetchYahooDirect(sym, exch){
 
 async function fetchYahooViaProxy(sym, exch){
   const userProxy = txt('corsProxy');
-  const proxies = userProxy ? [userProxy] : [];
-  // corsproxy.io dropped from the default chain — its free ?url= mode now returns
-  // HTTP 401 (needs an API key). allorigins/codetabs kept, but capped to 8s each
-  // instead of the browser's ~20-30s default timeout, since both were observed to
-  // hang rather than fail fast (likely Yahoo blocking known proxy IP ranges).
-  proxies.push('https://api.allorigins.win/raw?url=', 'https://api.codetabs.com/v1/proxy?quest=');
+  const defaults = ['https://api.allorigins.win/raw?url=', 'https://api.codetabs.com/v1/proxy?quest='];
+  const proxies = userProxy ? [...new Set([userProxy, ...defaults])] : defaults;
   const target = yahooUrl(sym, exch);
   let lastErr = null;
   for(const proxy of proxies){
