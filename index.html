@@ -204,6 +204,7 @@ details.tile[open] summary{margin-bottom:14px}
       <button class="ghost" onclick="window.print()">🖶 Print / PDF</button>
     </div>
     <div id="directLinkRow" class="directlink"></div>
+    <div class="lbl" style="margin-top:8px">Recommended: fill in your Apps Script URL in "Advanced" below — testing has shown public CORS proxies are unreliable specifically for Yahoo Finance (they either time out or now require paid API keys). The Apps Script backend avoids that layer entirely.</div>
     <div id="fileWarning" style="display:none;margin-top:10px;padding:10px 12px;border-radius:8px;background:rgba(244,73,92,.12);border:1px solid rgba(244,73,92,.4);font-size:12px;color:#ff9aa6">
       ⚠ This page is open as a local file (<code>file://…</code>). Most browsers block outgoing live-data requests from local files for security. Host this file over <b>https://</b> (e.g. GitHub Pages) to fix it properly.
     </div>
@@ -609,6 +610,23 @@ document.addEventListener('DOMContentLoaded', () => {
 function yahooSymbol(sym, exch){ return exch==='BSE' ? `${sym}.BO` : `${sym}.NS`; }
 function yahooUrl(sym, exch){ return `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol(sym,exch)}?interval=1d&range=2y`; }
 
+// Wraps fetch() with an AbortController timeout — several public CORS proxies were
+// observed to hang for 15-20+ seconds before failing rather than rejecting fast,
+// which made the fallback chain painfully slow. Capping each attempt keeps the
+// whole chain (Apps Script + direct + 2 proxies) under ~35s worst case instead of 60+.
+async function fetchWithTimeout(url, timeoutMs){
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try{
+    return await fetch(url, { signal: controller.signal });
+  } catch(e){
+    if(e.name === 'AbortError') throw new Error(`timed out after ${timeoutMs/1000}s`);
+    throw e;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 function updateDirectLink(){
   const sym = txt('symInput').toUpperCase();
   const exch = document.getElementById('exchInput').value;
@@ -629,7 +647,7 @@ async function fetchAppsScript(sym, exch){
   statusLine(`<a class="sourcelink" href="${url}" target="_blank" rel="noopener">${url} ↗</a>`);
   let resp;
   try{
-    resp = await fetch(url);
+    resp = await fetchWithTimeout(url, 10000);
   } catch(e){
     throw new Error(e.message + ' — a network-level failure like this on your own Apps Script URL usually means either the deployment\'s "Who has access" isn\'t set to "Anyone" (it redirects to a Google login page instead of responding), or this page is running from file:// rather than https://.');
   }
@@ -644,7 +662,7 @@ async function fetchYahooDirect(sym, exch){
   statusLine('<span class="spinner"></span>Trying a direct fetch to Yahoo Finance…');
   const url = yahooUrl(sym, exch);
   statusLine(`<a class="sourcelink" href="${url}" target="_blank" rel="noopener">${url} ↗</a>`);
-  const resp = await fetch(url);
+  const resp = await fetchWithTimeout(url, 8000);
   if(!resp.ok) throw new Error('HTTP ' + resp.status);
   const j = await resp.json();
   statusLine('✓ Direct fetch succeeded.', 'ok');
@@ -654,15 +672,18 @@ async function fetchYahooDirect(sym, exch){
 async function fetchYahooViaProxy(sym, exch){
   const userProxy = txt('corsProxy');
   const proxies = userProxy ? [userProxy] : [];
-  proxies.push('https://api.allorigins.win/raw?url=', 'https://corsproxy.io/?url=', 'https://api.codetabs.com/v1/proxy?quest=');
+  // corsproxy.io dropped from the default chain — its free ?url= mode now returns
+  // HTTP 401 (needs an API key). allorigins/codetabs kept, but capped to 8s each
+  // instead of the browser's ~20-30s default timeout, since both were observed to
+  // hang rather than fail fast (likely Yahoo blocking known proxy IP ranges).
+  proxies.push('https://api.allorigins.win/raw?url=', 'https://api.codetabs.com/v1/proxy?quest=');
   const target = yahooUrl(sym, exch);
   let lastErr = null;
   for(const proxy of proxies){
     try{
       const fullUrl = proxy + encodeURIComponent(target);
       statusLine(`<span class="spinner"></span>Trying proxy: ${proxy.split('/')[2]}… <a class="sourcelink" href="${fullUrl}" target="_blank" rel="noopener">open ↗</a>`);
-      const url = fullUrl;
-      const resp = await fetch(url);
+      const resp = await fetchWithTimeout(fullUrl, 8000);
       if(!resp.ok) throw new Error('HTTP ' + resp.status);
       const j = await resp.json();
       statusLine(`✓ Fetched via ${proxy.split('/')[2]}.`, 'ok');
@@ -1011,7 +1032,6 @@ async function runDiagnostics(){
   const targets = [
     ['Yahoo Finance direct', 'https://query1.finance.yahoo.com/v8/finance/chart/RELIANCE.NS?interval=1d&range=5d'],
     ['allorigins.win proxy', 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/RELIANCE.NS?interval=1d&range=5d')],
-    ['corsproxy.io proxy', 'https://corsproxy.io/?url=' + encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/RELIANCE.NS?interval=1d&range=5d')],
     ['codetabs.com proxy', 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/RELIANCE.NS?interval=1d&range=5d')],
   ];
   const appsScript = txt('appsScriptUrl');
@@ -1025,16 +1045,16 @@ async function runDiagnostics(){
   for(const [name, url] of targets){
     const t0 = performance.now();
     try{
-      const resp = await fetch(url);
+      const resp = await fetchWithTimeout(url, 10000);
       const ms = Math.round(performance.now()-t0);
       if(resp.ok){ line(`✓ ${name} — HTTP ${resp.status} in ${ms}ms`, 'ok'); }
       else { line(`✗ ${name} — HTTP ${resp.status} (${resp.statusText}) in ${ms}ms`, 'err'); }
     } catch(e){
       const ms = Math.round(performance.now()-t0);
-      line(`✗ ${name} — network error after ${ms}ms: "${e.message}" (this is what a CORS block, DNS failure, or offline connection all look like — the browser doesn't distinguish them for security reasons)`, 'err');
+      line(`✗ ${name} — ${e.message} after ${ms}ms`, 'err');
     }
   }
-  line('If everything above shows ✗ and this page is at file://, that\'s almost certainly the cause — host it over https:// and re-run this test. If it\'s already hosted over https:// and still fails, it\'s a network/firewall/proxy-availability issue rather than this page\'s code.');
+  line('If everything above shows ✗ and this page is at file://, that\'s almost certainly the cause — host it over https:// and re-run this test. If it\'s hosted over https:// and public proxies still fail while your Apps Script URL (if filled in) succeeds, that confirms the proxies themselves are the unreliable link, not this page — the Apps Script route is the one to rely on.');
 }
 
 
