@@ -168,6 +168,20 @@ button.ghost{background:transparent;border:1px solid var(--border);color:var(--g
 .sourcebadge.live{background:rgba(24,201,143,.16);color:#7de8bd}
 .sourcebadge.proxy{background:rgba(232,163,61,.16);color:var(--amber)}
 .sourcebadge.appsscript{background:rgba(139,123,216,.16);color:var(--violet)}
+.hero-form{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end}
+.hero-form .field{display:flex;flex-direction:column;gap:5px}
+.hero-form input{font-size:17px;padding:14px 16px;font-family:var(--mono);letter-spacing:1px;min-width:240px}
+.hero-form select{font-size:17px;padding:14px 16px;min-width:110px}
+.directlink{margin-top:12px;font-size:12.5px}
+.directlink a{color:var(--gold-2);text-decoration:none;border-bottom:1px dotted var(--gold-2)}
+.directlink a:hover{opacity:.8}
+details.tile summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--gold-2);list-style:none;display:flex;align-items:center;gap:8px}
+details.tile summary::-webkit-details-marker{display:none}
+details.tile summary::before{content:'▸';transition:transform .15s}
+details.tile[open] summary::before{transform:rotate(90deg)}
+details.tile[open] summary{margin-bottom:14px}
+.sourcelink{font-family:var(--mono);font-size:10.5px;color:var(--gold-2);text-decoration:none;word-break:break-all}
+.sourcelink:hover{text-decoration:underline}
 </style>
 </head>
 <body>
@@ -177,11 +191,11 @@ button.ghost{background:transparent;border:1px solid var(--border);color:var(--g
     <span class="tag">Private Client Research Terminal</span>
   </div>
 
-  <div class="tile gold no-print" style="padding:20px 22px">
-    <div class="card-title"><span class="ic">◆</span> Symbol &amp; Exchange</div>
-    <div class="searchbar">
+  <div class="tile gold no-print" style="padding:24px 26px">
+    <div class="card-title"><span class="ic">◆</span> Total Stock X-Ray</div>
+    <div class="hero-form">
       <div class="field"><label class="lbl">NSE / BSE Symbol</label>
-        <input id="symInput" autocomplete="off" placeholder="e.g. RELIANCE, HAL, TEJASNET..." />
+        <input id="symInput" autocomplete="off" placeholder="e.g. RELIANCE" />
       </div>
       <div class="field"><label class="lbl">Exchange</label>
         <select id="exchInput"><option>NSE</option><option>BSE</option></select>
@@ -189,21 +203,16 @@ button.ghost{background:transparent;border:1px solid var(--border);color:var(--g
       <button class="gold" onclick="fetchAndRender()">Fetch &amp; Generate X-Ray</button>
       <button class="ghost" onclick="window.print()">🖶 Print / PDF</button>
     </div>
-    <div class="lbl" style="margin-top:10px">No pre-loaded stock list — every report is fetched live for whatever symbol you type. Optional: fill in your Apps Script URL below first for the most reliable feed; otherwise this pulls straight from a free public quote source in your browser.</div>
+    <div id="directLinkRow" class="directlink"></div>
     <div id="fileWarning" style="display:none;margin-top:10px;padding:10px 12px;border-radius:8px;background:rgba(244,73,92,.12);border:1px solid rgba(244,73,92,.4);font-size:12px;color:#ff9aa6">
-      ⚠ This page is open as a local file (<code>file://…</code>). Most browsers block outgoing live-data requests from local files for security — this is very likely why fetches fail here regardless of your internet connection. Host this file over <b>https://</b> (e.g. GitHub Pages, the same way your other dashboards run) to fix it properly.
+      ⚠ This page is open as a local file (<code>file://…</code>). Most browsers block outgoing live-data requests from local files for security. Host this file over <b>https://</b> (e.g. GitHub Pages) to fix it properly.
     </div>
     <div id="fetchStatus"></div>
-    <div class="tiers">
-      <span class="badge-tier"><span class="sourcebadge appsscript">Apps Script</span> your backend, most reliable</span>
-      <span class="badge-tier"><span class="sourcebadge live">Direct fetch</span> free public source</span>
-      <span class="badge-tier"><span class="sourcebadge proxy">Via CORS proxy</span> fallback if direct is blocked</span>
-    </div>
   </div>
 
   <div class="tile no-print" id="manualPanel" style="display:none;margin-top:16px">
     <div class="card-title"><span class="ic">✎</span> Live Fetch Failed — Enter Data Manually</div>
-    <div class="lbl" style="margin-bottom:10px">All three fetch attempts (Apps Script / direct / proxy) failed for this symbol — likely a network or CORS block in this environment. You can still generate the report by typing in what you know; the same background formulas run either way.</div>
+    <div class="lbl" style="margin-bottom:10px">Every automatic attempt failed for this symbol — likely a network or CORS block in this environment. You can still generate the report by typing in what you know (or by copying numbers from the direct data-source link above); the same background formulas run either way.</div>
     <div class="grid g4">
       <div><label class="lbl">Symbol *</label><br><input id="m_symbol" style="width:100%"></div>
       <div><label class="lbl">Exchange</label><br><select id="m_exchange" style="width:100%"><option>NSE</option><option>BSE</option></select></div>
@@ -229,13 +238,13 @@ button.ghost{background:transparent;border:1px solid var(--border);color:var(--g
 
   <div id="reportArea"></div>
 
-  <div class="tile no-print" style="margin-top:22px">
-    <div class="card-title"><span class="ic">⇄</span> Live Data Connection</div>
+  <details class="tile no-print" style="margin-top:22px">
+    <summary>Advanced: Apps Script backend, CORS proxy &amp; diagnostics</summary>
     <div class="appsscript">
-      Fetch priority: <b>1)</b> your Apps Script URL below (if filled in — same backend pattern as the Big Fish Scanner / Macro dashboard, most reliable for NSE/BSE) →
+      Fetch priority: <b>1)</b> your Apps Script URL below (if filled in — most reliable) →
       <b>2)</b> a direct browser fetch to a free public quote source (Yahoo Finance chart API) →
       <b>3)</b> the same request routed through a public CORS proxy if the direct fetch is blocked.
-      RSI/MACD/ADX/Bollinger/OBV/Supertrend/50&amp;200-DMA are all computed client-side from the fetched price history — nothing here is hardcoded.
+      RSI/MACD/ADX/Bollinger/OBV/Supertrend/50&amp;200-DMA are all computed client-side from the fetched price history.
       <br><br>
       <label class="lbl">APPS_SCRIPT_URL (optional) — expected to accept <code>?symbol=SYM&amp;exchange=NSE</code> and return JSON with a daily OHLCV series</label>
       <input type="text" id="appsScriptUrl" placeholder="https://script.google.com/macros/s/XXXXXXXX/exec?symbol=" />
@@ -246,7 +255,7 @@ button.ghost{background:transparent;border:1px solid var(--border);color:var(--g
       <button class="ghost" onclick="runDiagnostics()">Run Connection Diagnostics</button>
       <div id="diagOut" style="margin-top:10px"></div>
     </div>
-  </div>
+  </details>
 
   <div class="footer">Joshi's Corner &middot; Educational research tool, not investment advice</div>
 </div>
@@ -591,8 +600,23 @@ if(window.location.protocol === 'file:'){
     if(w) w.style.display = 'block';
   });
 }
+document.addEventListener('DOMContentLoaded', () => {
+  const s = document.getElementById('symInput'), x = document.getElementById('exchInput');
+  if(s){ s.addEventListener('input', updateDirectLink); }
+  if(x){ x.addEventListener('change', updateDirectLink); }
+});
 
 function yahooSymbol(sym, exch){ return exch==='BSE' ? `${sym}.BO` : `${sym}.NS`; }
+function yahooUrl(sym, exch){ return `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol(sym,exch)}?interval=1d&range=2y`; }
+
+function updateDirectLink(){
+  const sym = txt('symInput').toUpperCase();
+  const exch = document.getElementById('exchInput').value;
+  const row = document.getElementById('directLinkRow');
+  if(!sym){ row.innerHTML=''; return; }
+  const url = yahooUrl(sym, exch);
+  row.innerHTML = `Data source for ${sym} (${exch}): <a href="${url}" target="_blank" rel="noopener">${url} ↗</a> — opens the raw JSON directly in a new tab (this always works even if the automated fetch below is blocked, since it's a normal page navigation, not a script-level request).`;
+}
 
 async function fetchAppsScript(sym, exch){
   const base = txt('appsScriptUrl');
@@ -602,6 +626,7 @@ async function fetchAppsScript(sym, exch){
   }
   statusLine('<span class="spinner"></span>Trying your Apps Script backend…');
   const url = base + encodeURIComponent(sym) + '&exchange=' + exch;
+  statusLine(`<a class="sourcelink" href="${url}" target="_blank" rel="noopener">${url} ↗</a>`);
   let resp;
   try{
     resp = await fetch(url);
@@ -617,8 +642,8 @@ async function fetchAppsScript(sym, exch){
 
 async function fetchYahooDirect(sym, exch){
   statusLine('<span class="spinner"></span>Trying a direct fetch to Yahoo Finance…');
-  const ysym = yahooSymbol(sym, exch);
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ysym}?interval=1d&range=2y`;
+  const url = yahooUrl(sym, exch);
+  statusLine(`<a class="sourcelink" href="${url}" target="_blank" rel="noopener">${url} ↗</a>`);
   const resp = await fetch(url);
   if(!resp.ok) throw new Error('HTTP ' + resp.status);
   const j = await resp.json();
@@ -630,13 +655,13 @@ async function fetchYahooViaProxy(sym, exch){
   const userProxy = txt('corsProxy');
   const proxies = userProxy ? [userProxy] : [];
   proxies.push('https://api.allorigins.win/raw?url=', 'https://corsproxy.io/?url=', 'https://api.codetabs.com/v1/proxy?quest=');
-  const ysym = yahooSymbol(sym, exch);
-  const target = `https://query1.finance.yahoo.com/v8/finance/chart/${ysym}?interval=1d&range=2y`;
+  const target = yahooUrl(sym, exch);
   let lastErr = null;
   for(const proxy of proxies){
     try{
-      statusLine(`<span class="spinner"></span>Trying proxy: ${proxy.split('/')[2]}…`);
-      const url = proxy + encodeURIComponent(target);
+      const fullUrl = proxy + encodeURIComponent(target);
+      statusLine(`<span class="spinner"></span>Trying proxy: ${proxy.split('/')[2]}… <a class="sourcelink" href="${fullUrl}" target="_blank" rel="noopener">open ↗</a>`);
+      const url = fullUrl;
       const resp = await fetch(url);
       if(!resp.ok) throw new Error('HTTP ' + resp.status);
       const j = await resp.json();
